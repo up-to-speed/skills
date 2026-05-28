@@ -1,0 +1,35 @@
+{
+  "name": "@commandcenter/skills",
+  "version": "0.0.1",
+  "description": "Public skills for Command Center, usable from Claude Code, Codex, and any CLI agent.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/up-to-speed/skills.git"
+  },
+  "bugs": {
+    "url": "https://github.com/up-to-speed/skills/issues"
+  },
+  "homepage": "https://github.com/up-to-speed/skills#readme",
+  "type": "module",
+  "engines": {
+    "node": ">=18"
+  },
+  "bin": {
+    "cc-walkthrough": "./bin/cc-walkthrough.mjs"
+  },
+  "files": [
+    "bin",
+    "skills",
+    ".claude-plugin",
+    "README.md",
+    "LICENSE"
+  ],
+  "keywords": [
+    "command-center",
+    "claude-code",
+    "codex",
+    "skill",
+    "walkthrough"
+  ]
+}
