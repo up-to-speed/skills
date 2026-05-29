@@ -16,7 +16,7 @@
     "node": ">=18"
   },
   "bin": {
-    "cc-walkthrough": "./bin/cc-walkthrough.mjs"
+    "skills": "./bin/skills.mjs"
   },
   "files": [
     "bin",

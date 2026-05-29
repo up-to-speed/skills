@@ -14,11 +14,13 @@ Public skills for [Command Center](https://commandcenter.ai), usable from Claude
 /plugin install up-to-speed/skills
 ```
 
-**npx (Codex, terminal, anywhere)**
+**npx (Codex, terminal, anywhere with Node ≥18)**
 
 ```
-npx -y @commandcenter/skills cc-walkthrough
+npx -y @commandcenter/skills walkthrough
 ```
+
+`npx @commandcenter/skills <skill> [args]` is the universal entry: the package ships one `skills` bin that dispatches to the named skill.
 
 ## License
 
