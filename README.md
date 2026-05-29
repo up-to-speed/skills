@@ -32,13 +32,17 @@ For Codex, add an `AGENTS.md` entry pointing at the same command.
 
 ## Requirements
 
-A locally-running Command Center on `127.0.0.1:6112`. The runner will:
+Node ≥18.
 
-1. Launch the Electron app if installed.
-2. Otherwise prompt you to install it (Electron download or `npx @commandcenter/command-center`).
-3. Block on `GET /health` until the backend is ready.
+That's it on the runner side. Everything else is preflighted at runtime — the runner detects the state of your machine and either fixes it or emits a structured `action-required` event telling you what to do:
 
-You also need a signed-in CC session and at least one configured model provider. The runner detects both and surfaces structured `action-required` events if either is missing.
+| Precondition | What the runner does |
+|---|---|
+| Command Center installed | Launches the Electron app if present; otherwise tells you how to install it. |
+| Backend reachable on `127.0.0.1:6112` | Polls `GET /health` after launch. |
+| Signed in | Reads the session token; surfaces `not-logged-in` if missing or rejected. |
+| A model provider configured | Calls `models.getAvailability`; surfaces `no-model` if not. |
+| Current directory is a CC workspace | Calls `projects.findWorkspaceByPath`; surfaces `no-workspace` if not. |
 
 ## Output contract (for agent integrators)
 
