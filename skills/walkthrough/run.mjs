@@ -562,6 +562,16 @@ async function waitForCompletion({ sessionToken, workspaceId, taskId }) {
       sessionToken,
     });
 
+    // null = backend doesn't know this task (likely evicted across a
+    // backend restart; getTaskStatus stores completed tasks in memory).
+    if (state === null) {
+      fail(
+        "generation-failed",
+        "Walkthrough task is no longer tracked by the backend (it may have restarted). Try again.",
+        EXIT.GENERATION_FAILED,
+      );
+    }
+
     if (state.status === "running") {
       const pct = state.progress?.percentageDone ?? 0;
       if (pct !== lastPct) {
@@ -580,13 +590,6 @@ async function waitForCompletion({ sessionToken, workspaceId, taskId }) {
       fail(
         "generation-failed",
         "Walkthrough generation was cancelled.",
-        EXIT.GENERATION_FAILED,
-      );
-    } else if (state.status === "unknown") {
-      // Task likely fell out of memory (e.g. backend restart). Treat as failure.
-      fail(
-        "generation-failed",
-        "Walkthrough task is no longer tracked by the backend (it may have restarted). Try again.",
         EXIT.GENERATION_FAILED,
       );
     }
