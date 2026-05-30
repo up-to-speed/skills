@@ -17,11 +17,21 @@ The user asks for a walkthrough of the current branch, a pull request, a commit 
 
 ## How to invoke
 
-Run the runner. The runner does all the work — installation detection, backend startup, auth/model/workspace checks, walkthrough generation, and browser open.
+Run `run.mjs` — it sits in the same directory as this `SKILL.md`. The runner does all the work: installation detection, backend startup, auth/model/workspace checks, walkthrough generation, and browser open.
 
 ```bash
-node "${CLAUDE_PLUGIN_ROOT}/skills/walkthrough/run.mjs" [from..to] [--files=PATTERN[,PATTERN...]]
+node <SKILL_DIR>/run.mjs [from..to] [--files=PATTERN[,PATTERN...]]
 ```
+
+`<SKILL_DIR>` is wherever the `skills` CLI installed this skill. Common locations:
+
+| Surface | Path |
+|---|---|
+| Claude Code, project-local | `./.claude/skills/walkthrough` |
+| Claude Code, global (`-g`) | `~/.claude/skills/walkthrough` |
+| Any other agent | `./.agents/skills/walkthrough` |
+
+If you loaded this `SKILL.md` from disk, the runner is its sibling — substitute that directory.
 
 Both arguments are optional. By default the walkthrough covers **the whole diff** for the resolved range.
 
