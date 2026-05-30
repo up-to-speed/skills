@@ -11,7 +11,13 @@
 // Zero npm dependencies. Plain Node ≥18, only `node:*` imports.
 
 import { spawn, spawnSync } from "node:child_process";
-import { readFileSync, existsSync, statSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  openSync,
+  readFileSync,
+  statSync,
+} from "node:fs";
 import { homedir, platform } from "node:os";
 import { join, resolve as resolvePath } from "node:path";
 import { setTimeout as sleep } from "node:timers/promises";
@@ -240,8 +246,10 @@ function launchHeadlessBackend(dataDir) {
   // undiscoverable. We set it explicitly so our spawn behaves like the
   // Electron-spawned one.
   //
-  // Detached + ignored stdio so the backend keeps running after this
-  // process exits. The /health + port-file polling loop decides success.
+  // Detached so the backend keeps running after this process exits.
+  // Pipe stdout/stderr to a log file rather than ignoring them so a
+  // silent-failure spawn (npx exiting non-zero, network blocked, etc.)
+  // can be diagnosed from the log path we surface in the timeout error.
   //
   // First run downloads ~80MB; warn the agent so it can surface that to
   // the user instead of looking like a hang.
@@ -249,18 +257,20 @@ function launchHeadlessBackend(dataDir) {
     "Starting Command Center via npx (first run downloads ~80MB; subsequent runs are cached)…",
   );
   try {
+    const runtimeDir = join(dataDir, "runtime");
+    mkdirSync(runtimeDir, { recursive: true });
+    const logPath = join(runtimeDir, "skill-launch.log");
+    const logFd = openSync(logPath, "a");
+
     const cmd = platform() === "win32" ? "npx.cmd" : "npx";
     spawn(cmd, ["-y", "@command-center/command-center", "--no-open"], {
       detached: true,
-      stdio: "ignore",
-      env: {
-        ...process.env,
-        CC_PORT_FILE_DIR: join(dataDir, "runtime"),
-      },
+      stdio: ["ignore", logFd, logFd],
+      env: { ...process.env, CC_PORT_FILE_DIR: runtimeDir },
     }).unref();
-    return true;
-  } catch {
-    return false;
+    return { ok: true, logPath };
+  } catch (err) {
+    return { ok: false, reason: err instanceof Error ? err.message : String(err) };
   }
 }
 
@@ -278,18 +288,20 @@ async function ensureRunning(install) {
   }
 
   let timeoutMs = HEALTH_TIMEOUT_MS;
+  let launchLogPath = null;
   if (install.hasElectron) {
     status("Launching Command Center…");
     launchElectron();
   } else if (install.hasData) {
     const launched = launchHeadlessBackend(install.dataDir);
-    if (!launched) {
+    if (!launched.ok) {
       actionRequired(
         "not-running",
-        "Command Center data is present but the backend isn't running. Open the Command Center app, or run `npx -y @command-center/command-center --no-open` to start it, then re-run this command.",
+        `Command Center data is present but the backend isn't running, and the runner couldn't spawn it (${launched.reason}). Open the Command Center app, or run \`npx -y @command-center/command-center --no-open\` to start it, then re-run this command.`,
       );
       process.exit(EXIT.NOT_RUNNING);
     }
+    launchLogPath = launched.logPath;
     timeoutMs = HEADLESS_HEALTH_TIMEOUT_MS;
   } else {
     actionRequired(
@@ -303,10 +315,15 @@ async function ensureRunning(install) {
   status("Waiting for Command Center backend…");
   const origin = await waitForHealthy(install.dataDir, timeoutMs);
   if (!origin) {
+    const portFile = join(install.dataDir, ...PORT_FILE_RELATIVE);
+    const logHint = launchLogPath
+      ? ` See ${launchLogPath} for the spawn's output.`
+      : "";
     fail(
       "not-running",
-      `Command Center backend did not become ready within ${timeoutMs / 1000}s (waiting for ${join(install.dataDir, ...PORT_FILE_RELATIVE)} and a healthy /health response).`,
+      `Command Center backend did not become ready within ${timeoutMs / 1000}s (tried ${portFile} for a written port, and ${DEFAULT_ORIGIN}/health).${logHint}`,
       EXIT.NOT_RUNNING,
+      { launchLogPath },
     );
   }
   backendOrigin = origin;
