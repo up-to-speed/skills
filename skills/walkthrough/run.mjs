@@ -61,6 +61,11 @@ const HEALTH_POLL_INTERVAL_MS = 250;
 
 // How long between getTaskStatus polls.
 const TASK_POLL_INTERVAL_MS = 1_000;
+
+// Sign-in waiting: opening the sign-in surface and polling auth.getStatus
+// until the user completes the flow in their browser / Electron app.
+const LOGIN_TIMEOUT_MS = 5 * 60 * 1_000;
+const LOGIN_POLL_INTERVAL_MS = 2_000;
 // Cap on total generation wait time. Walkthroughs typically finish in
 // tens of seconds; this cap is just a safety net.
 const TASK_TIMEOUT_MS = 10 * 60 * 1_000;
@@ -441,41 +446,73 @@ async function checkVersion() {
 // Auth check
 // #######################################
 
-async function checkAuth(sessionToken) {
-  if (!sessionToken) {
-    actionRequired(
-      "not-logged-in",
-      "Command Center session token not found. Open the app to sign in, then re-run.",
-    );
-    process.exit(EXIT.NOT_LOGGED_IN);
-  }
-
-  let authStatus;
-  try {
-    authStatus = await trpcCall({
-      path: "auth.getStatus",
-      type: "query",
-      sessionToken,
-    });
-  } catch (e) {
-    if (e instanceof BackendError && e.httpStatus === 401) {
-      actionRequired(
-        "not-logged-in",
-        "Command Center session token is invalid. Open the app to sign in, then re-run.",
-      );
-      process.exit(EXIT.NOT_LOGGED_IN);
+// Returns the (possibly refreshed) session token once auth is confirmed.
+async function checkAuth(initialToken, install) {
+  const probe = async (token) => {
+    if (!token) return { ok: false, reason: "no-token" };
+    try {
+      const status = await trpcCall({
+        path: "auth.getStatus",
+        type: "query",
+        sessionToken: token,
+      });
+      // Language-stable: credential undefined ⇒ unauthenticated.
+      return status?.credential
+        ? { ok: true }
+        : { ok: false, reason: "no-credential" };
+    } catch (e) {
+      if (e instanceof BackendError && e.httpStatus === 401) {
+        return { ok: false, reason: "invalid-token" };
+      }
+      throw e;
     }
-    throw e;
+  };
+
+  const first = await probe(initialToken);
+  if (first.ok) return initialToken;
+
+  return await waitForSignIn(install, initialToken, probe);
+}
+
+// Open the sign-in surface (Electron if available, else the web UI on
+// the backend's bound port) and block until either the user completes
+// the flow or the deadline passes. Polls auth.getStatus on each beat
+// and re-reads the session token from disk in case sign-in rewrites it.
+async function waitForSignIn(install, initialToken, probe) {
+  if (install.hasElectron) {
+    status("Opening Command Center to sign in…");
+    launchElectron();
+  } else {
+    status(`Opening ${backendOrigin} to sign in…`, { signInUrl: backendOrigin });
+    openUrl(backendOrigin);
   }
 
-  // Language-stable discriminant: `credential` undefined ⇒ unauthenticated.
-  if (!authStatus?.credential) {
-    actionRequired(
-      "not-logged-in",
-      "You are not signed in to Command Center. Open the app to sign in, then re-run.",
-    );
-    process.exit(EXIT.NOT_LOGGED_IN);
+  status(
+    `Waiting for sign-in to complete (up to ${Math.round(LOGIN_TIMEOUT_MS / 60_000)} min)…`,
+  );
+  const deadline = Date.now() + LOGIN_TIMEOUT_MS;
+  let token = initialToken;
+  while (Date.now() < deadline) {
+    await sleep(LOGIN_POLL_INTERVAL_MS);
+    // Re-read in case the sign-in flow rotated it (or it was missing at
+    // start — common right after launching a fresh `npx` backend).
+    token = readSessionToken(install.dataDir) ?? token;
+    const result = await probe(token);
+    if (result.ok) {
+      status("Signed in.");
+      return token;
+    }
   }
+
+  fail(
+    "not-logged-in",
+    `Sign-in did not complete within ${Math.round(LOGIN_TIMEOUT_MS / 60_000)} minutes. ${
+      install.hasElectron
+        ? "Open the Command Center app and sign in, then re-run."
+        : `Open ${backendOrigin} and sign in, then re-run.`
+    }`,
+    EXIT.NOT_LOGGED_IN,
+  );
 }
 
 // #######################################
@@ -845,8 +882,10 @@ async function main() {
   await ensureRunning(install);
   await checkVersion();
 
-  const sessionToken = readSessionToken(install.dataDir);
-  await checkAuth(sessionToken);
+  const sessionToken = await checkAuth(
+    readSessionToken(install.dataDir),
+    install,
+  );
   await checkModel(sessionToken);
 
   const workspaceId = await resolveWorkspace(sessionToken, cwd);
