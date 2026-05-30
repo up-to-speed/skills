@@ -12,7 +12,7 @@ Public skills for [Command Center](https://up-to-speed.ai), usable from Claude C
 npx skills add command-center-ai/skills
 ```
 
-Add `--skill walkthrough` to install just one skill, `-g` for a global (user-wide) install, or `-a <agent>` to target a specific agent. See the [skills CLI docs](https://www.npmjs.com/package/skills) for the full option list and the supported-agent matrix.
+Add `-g` for a global (user-wide) install or `-a <agent>` to target a specific agent. See the [skills CLI docs](https://www.npmjs.com/package/skills) for the full option list and the supported-agent matrix.
 
 ## License
 
