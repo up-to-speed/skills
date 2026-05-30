@@ -1,6 +1,6 @@
 # Command Center Skills
 
-Public skills for [Command Center](https://commandcenter.ai), usable from Claude Code, Codex, and any agent supported by the [`skills`](https://www.npmjs.com/package/skills) CLI.
+Public skills for [Command Center](https://up-to-speed.ai), usable from Claude Code, Codex, and any agent supported by the [`skills`](https://www.npmjs.com/package/skills) CLI.
 
 | Skill | What it does |
 |---|---|

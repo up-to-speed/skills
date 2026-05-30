@@ -211,10 +211,14 @@ function launchElectron() {
 }
 
 function launchHeadlessBackend() {
-  // TODO: replace with the real published npx package name when it ships.
-  // The expected invocation surface is `npx -y <pkg> --no-open` per the
-  // walkthrough-skill plan. Until that package exists, fall back to
-  // surfacing a clear action-required error.
+  // The CC binary distribution is published as `@command-center/command-center`
+  // (https://www.npmjs.com/package/@command-center/command-center), so the
+  // package side is settled. What's not settled: the CLI flags. The plan
+  // referenced `--no-open` but I haven't verified it against the published
+  // bin. Leaving this stub returning false until the flag surface is
+  // confirmed — premature spawning would either pop the Electron UI when
+  // headless was wanted or hang on an unknown flag.
+  // TODO: verify `@command-center/command-center` --help, then spawn here.
   return false;
 }
 
@@ -234,15 +238,15 @@ async function ensureRunning(install) {
     if (!launched) {
       actionRequired(
         "not-running",
-        "Command Center is installed but not running. Open the app, then re-run this command.",
+        "Command Center data is present but the backend isn't running. Open the Command Center app, or run `npx -y @command-center/command-center` to start it, then re-run this command.",
       );
       process.exit(EXIT.NOT_RUNNING);
     }
   } else {
     actionRequired(
       "not-installed",
-      "Command Center is not installed. Download it at https://commandcenter.ai or run `npx -y @commandcenter/command-center`.",
-      { url: "https://commandcenter.ai" },
+      "Command Center is not installed. Download it at https://up-to-speed.ai or run `npx -y @command-center/command-center`.",
+      { url: "https://up-to-speed.ai" },
     );
     process.exit(EXIT.NOT_INSTALLED);
   }
